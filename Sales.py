@@ -22,7 +22,7 @@ job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
 
 # Script generated for node Amazon S3
-AmazonS3_node1707466350365 = glueContext.create_dynamic_frame.from_options(
+salesDF = glueContext.create_dynamic_frame.from_options(
     format_options={
         "quoteChar": '"',
         "withHeader": True,
@@ -32,12 +32,12 @@ AmazonS3_node1707466350365 = glueContext.create_dynamic_frame.from_options(
     connection_type="s3",
     format="csv",
     connection_options={"paths": ["s3://final23/"], "recurse": True},
-    transformation_ctx="AmazonS3_node1707466350365",
+    transformation_ctx="salesDF",
 )
 
 # Script generated for node Change Schema
-ChangeSchema_node1707466384797 = ApplyMapping.apply(
-    frame=AmazonS3_node1707466350365,
+salesDF = ApplyMapping.apply(
+    frame=salesDF,
     mappings=[
         ("date_", "string", "Date", "date"),
         ("city_name", "string", "City", "string"),
@@ -55,7 +55,7 @@ ChangeSchema_node1707466384797 = ApplyMapping.apply(
             "decimal",
         ),
     ],
-    transformation_ctx="ChangeSchema_node1707466384797",
+    transformation_ctx="salesDF",
 )
 
 # Script generated for node SQL Query
@@ -70,27 +70,27 @@ SELECT
 FROM
     myDataSource;
 """
-SQLQuery_node1707466387997 = sparkSqlQuery(
+salesDF = sparkSqlQuery(
     glueContext,
     query=SqlQuery0,
-    mapping={"myDataSource": ChangeSchema_node1707466384797},
-    transformation_ctx="SQLQuery_node1707466387997",
+    mapping={"myDataSource": salesDF},
+    transformation_ctx="salesDF",
 )
 
 # Script generated for node Amazon S3
-AmazonS3_node1707466390637 = glueContext.getSink(
-    path="s3://dest-bucket23/",
+sales_data_sink = glueContext.getSink(
+    path="s3://dest-bucket23/sales_dest/",
     connection_type="s3",
     updateBehavior="UPDATE_IN_DATABASE",  # Using Glue Job Bookmark for update behavior
     partitionKeys=[],
     enableUpdateCatalog=True,
-    transformation_ctx="AmazonS3_node1707466390637",
+    transformation_ctx="sales_data_sink",
 )
-AmazonS3_node1707466390637.setCatalogInfo(
-    catalogDatabase="flipkart_testing", catalogTableName="SALES_via_CFT"
+sales_data_sink.setCatalogInfo(
+    catalogDatabase="flipkart_database", catalogTableName="sales"
 )
-AmazonS3_node1707466390637.setFormat("glueparquet", compression="uncompressed")
-AmazonS3_node1707466390637.writeFrame(SQLQuery_node1707466387997)
+sales_data_sink.setFormat("glueparquet", compression="uncompressed")
+sales_data_sink.writeFrame(salesDF)
 
 # Commit the job
 job.commit()
